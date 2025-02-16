@@ -1,0 +1,11 @@
+[package]
+name = "ts-vis-rs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.29", features = ["derive"] }
+glob = "0.3.2"
+graphviz-rust = "0.9.3"
+oxc = { version = "0.51.0", features = ["full"] }
+oxc_resolver = "4.1.0"
