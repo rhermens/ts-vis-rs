@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use glob::Pattern;
-use ts_graphviz::{Scanner, ScannerOptions};
+use ts_vis_rs::{Scanner, ScannerOptions};
 
 #[derive(Parser, Debug)]
 struct CliArgs {

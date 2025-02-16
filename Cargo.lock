@@ -1468,7 +1468,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ts-graphviz"
+name = "ts-vis-rs"
 version = "0.1.0"
 dependencies = [
  "clap",
