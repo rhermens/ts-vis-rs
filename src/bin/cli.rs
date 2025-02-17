@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use clap::Parser;
 use glob::Pattern;
@@ -35,7 +35,7 @@ fn main() {
     );
     let graph = scanner.scan(&args.entry);
 
-    println!("{}", graph.print_graphviz());
+    let _ = std::io::stdout().write_all(graph.print_graphviz().as_bytes());
 }
 
 fn find_root(entry: &PathBuf) -> Option<PathBuf> {

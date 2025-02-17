@@ -5,7 +5,22 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.29", features = ["derive"] }
+eframe = { version = "0.30.0" }
+egui = { version = "0.30.0" }
+egui_extras = { version = "0.30.0" }
+egui_graphs = "0.23.0"
 glob = "0.3.2"
 graphviz-rust = "0.9.3"
 oxc = { version = "0.51.0", features = ["full"] }
 oxc_resolver = "4.1.0"
+petgraph = "0.6"
+
+[features]
+# gui = ["dep:egui", "dep:eframe"]
+
+[[bin]]
+name = "cli"
+
+[[bin]]
+name = "gui"
+

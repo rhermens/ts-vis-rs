@@ -2,15 +2,28 @@ use std::path::{Path, PathBuf};
 
 use glob::Pattern;
 use graphviz_rust::{
-    dot_structures::{Edge, EdgeTy, Graph, Id, Node, NodeId, Stmt, Vertex},
-    printer::{DotPrinter, PrinterContext},
+    cmd::Format, dot_structures::{Attribute, Edge, EdgeTy, Graph, Id, Node, NodeId, Stmt, Vertex}, printer::{DotPrinter, PrinterContext}
 };
 use oxc::{allocator::Allocator, parser::Parser, span::SourceType};
 use oxc_resolver::{ResolveOptions, Resolver, TsconfigOptions, TsconfigReferences};
+use petgraph::prelude::StableGraph;
 
+pub mod app;
+pub mod js;
+
+#[derive(Clone)]
 pub struct ScannerOptions {
     pub filter: Vec<Pattern>,
-    pub include: Option<Vec<Pattern>>
+    pub include: Option<Vec<Pattern>>,
+}
+
+impl Default for ScannerOptions {
+    fn default() -> Self {
+        Self {
+            filter: vec![Pattern::new("*node_modules/*").unwrap()],
+            include: None,
+        }
+    }
 }
 
 pub struct Scanner {
@@ -19,6 +32,7 @@ pub struct Scanner {
     options: ScannerOptions,
 }
 
+#[derive(Debug)]
 pub struct Container {
     nodes: Vec<PathBuf>,
     edges: Vec<(PathBuf, PathBuf)>,
@@ -34,7 +48,36 @@ impl Container {
         }
     }
 
-    pub fn print_graphviz(&self) -> String {
+    pub fn build_petgraph(&self) -> StableGraph<String, ()> {
+        let mut g = StableGraph::new();
+        
+        for node in self.nodes.iter().filter(|n| match &self.include {
+            Some(includes) => includes.iter().any(|i| i.matches_path(n)),
+            None => true,
+        }) {
+            g.add_node(node.to_string_lossy().to_string());
+        }
+
+        for (source, target) in self
+            .edges
+            .iter()
+            .filter(|(source, target)| match &self.include {
+                Some(includes) => {
+                    includes.iter().any(|i| i.matches_path(source))
+                        && includes.iter().any(|i| i.matches_path(target))
+                }
+                None => true,
+            })
+        {
+            let source = g.node_indices().find(|i| g[*i] == source.to_string_lossy().to_string()).unwrap();
+            let target = g.node_indices().find(|i| g[*i] == target.to_string_lossy().to_string()).unwrap();
+            g.add_edge(source, target, ());
+        }
+
+        g
+    }
+
+    fn build_graph(&self) -> Graph {
         let mut graph = Graph::DiGraph {
             id: Id::Plain("main".to_string()),
             strict: false,
@@ -45,13 +88,26 @@ impl Container {
             Some(includes) => includes.iter().any(|i| i.matches_path(n)),
             None => true,
         }) {
-            graph.add_stmt(Stmt::Node(Node::new(path_to_node_id(node), vec![])));
+            graph.add_stmt(Stmt::Node(Node::new(
+                path_to_node_id(node),
+                vec![Attribute(
+                    Id::Plain("shape".to_string()),
+                    Id::Plain("record".to_string()),
+                )],
+            )));
         }
 
-        for (source, target) in self.edges.iter().filter(|(source, target)| match &self.include {
-            Some(includes) => includes.iter().any(|i| i.matches_path(source)) && includes.iter().any(|i| i.matches_path(target)),
-            None => true,
-        }) {
+        for (source, target) in self
+            .edges
+            .iter()
+            .filter(|(source, target)| match &self.include {
+                Some(includes) => {
+                    includes.iter().any(|i| i.matches_path(source))
+                        && includes.iter().any(|i| i.matches_path(target))
+                }
+                None => true,
+            })
+        {
             graph.add_stmt(Stmt::Edge(Edge {
                 ty: EdgeTy::Pair(
                     Vertex::N(path_to_node_id(source)),
@@ -61,6 +117,16 @@ impl Container {
             }));
         }
 
+        graph
+    }
+
+    pub fn into_svg(&self) -> Result<Vec<u8>, std::io::Error> {
+        let graph = self.build_graph();
+        graphviz_rust::exec(graph, &mut PrinterContext::default(), vec![Format::Svg.into()])
+    }
+
+    pub fn print_graphviz(&self) -> String {
+        let graph = self.build_graph();
         return graph.print(&mut PrinterContext::default());
     }
 }
@@ -96,6 +162,14 @@ impl Scanner {
             }),
             options,
         }
+    }
+
+    pub fn set_filters(&mut self, filters: Vec<Pattern>) {
+        self.options.filter = filters;
+    }
+
+    pub fn set_includes(&mut self, includes: Option<Vec<Pattern>>) {
+        self.options.include = includes;
     }
 
     pub fn scan(&self, path: &PathBuf) -> Container {
